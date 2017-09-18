@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns="http://xmlns.jcp.org/xml/ns/javaee"
+	xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee http://xmlns.jcp.org/xml/ns/javaee/web-app_3_1.xsd"
+	id="WebApp_ID" version="3.1">
+	<display-name>First</display-name>
+	<servlet>
+		<servlet-name>olami</servlet-name>
+		<servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+		<init-param>
+			<param-name>contextConfigLocation</param-name>
+			<param-value>/WEB-INF/olami-servlet.xml</param-value>
+		</init-param>
+		<load-on-startup>1</load-on-startup>
+		<multipart-config>
+			<!-- <location>/</location> -->
+			<max-file-size>524288</max-file-size>  <!--单个文件最大大小：0.5MB -->
+			<max-request-size>2097152</max-request-size>   <!--所有文件最大大小：2MB -->
+			<file-size-threshold>0</file-size-threshold>    <!-- 超过这个大小直接存硬盘，而不是内存 -->
+		</multipart-config>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>olami</servlet-name>
+		<url-pattern>/</url-pattern>
+	</servlet-mapping>
+	
+	<welcome-file-list>
+		<welcome-file>index.html</welcome-file>
+		<welcome-file>index.htm</welcome-file>
+		<welcome-file>index.jsp</welcome-file>
+		<welcome-file>default.html</welcome-file>
+		<welcome-file>default.htm</welcome-file>
+		<welcome-file>default.jsp</welcome-file>
+	</welcome-file-list>
+</web-app>
