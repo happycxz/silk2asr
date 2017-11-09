@@ -156,12 +156,12 @@ public class Util {
 	}
 	
 	/**
-	 * 根据当前日期，获取yyyyMMdd格式字符串
+	 * 根据当前日期，获取yyyy.MM格式字符串
 	 * @return
 	 */
 	public static String getDateStr() {
 		Calendar c1 = Calendar.getInstance();
-        String logdate = FastDateFormat.getInstance("yyyyMMdd").format(c1.getTime());
+        String logdate = FastDateFormat.getInstance("yyyy.MM.dd").format(c1.getTime());
         return logdate;
 	}
 	
@@ -174,7 +174,6 @@ public class Util {
         String logdate = FastDateFormat.getInstance("yyyy-MM-dd HH:mm:ss.SSS").format(c1.getTime());
         return logdate;
 	}
-	
 	
 	
 	/**

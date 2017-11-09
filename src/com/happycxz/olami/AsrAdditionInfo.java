@@ -64,7 +64,7 @@ public class AsrAdditionInfo {
 		}
 		
 		if (this.errCode == 0) {
-			this.voiceFileName = Util.getCurrentMilliSecond() + "_" + this.userId + "_" + this.appKey + ".silk";
+			this.voiceFileName = Util.getCurrentMilliSecond() + "_" + this.userId + "_" + this.appKey;
 		}
 	}
 
@@ -108,12 +108,9 @@ public class AsrAdditionInfo {
 		this.userId = userId;
 	}
 
-	public String getVoiceFileName() {
-		return voiceFileName;
-	}
-
-	public void setVoiceFileName(String voiceFileName) {
-		this.voiceFileName = voiceFileName;
+	public String getVoiceFileName(boolean isMp3) {
+		String suffix = isMp3 ? ".mp3" : ".silk";
+		return voiceFileName + suffix;
 	}
 
 	public int getErrCode() {

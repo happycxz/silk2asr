@@ -39,7 +39,7 @@ public class OlamiController {
 	//保存linux shell命令字符串
 	private static final String SHELL_CMD = Configuration.getInstance().getValue("local.shell.cmd", "sh /YOUR_PATH/silk-v3-decoder/converter_cxz.sh %s wav");
 
-    //保存silk和wav文件的目录，放在web目录、或一个指定的绝对目录下 
+    //保存silk_v3, mp3和wav文件的目录，放在web目录、或一个指定的绝对目录下 
     private static final String localFilePath = Configuration.getInstance().getValue("local.file.path", "/YOUR/LOCAL/VOICE/PATH/");;  
     
     static {
@@ -50,6 +50,17 @@ public class OlamiController {
     @RequestMapping(value="/asr", produces="plain/text; charset=UTF-8")  
     public @ResponseBody String asrUploadFile(HttpServletRequest request, HttpServletResponse response, @RequestParam Map<String, Object> p)  
             throws ServletException, IOException {  
+    	return processBase(request, p, false);
+    }  
+   
+    @RequestMapping(value="/mp3asr", produces="plain/text; charset=UTF-8")  
+    public @ResponseBody String asrUploadFileMp3(HttpServletRequest request, HttpServletResponse response, @RequestParam Map<String, Object> p)  
+            throws ServletException, IOException {
+    	return processBase(request, p, true);
+    }
+    
+    public String processBase(HttpServletRequest request, @RequestParam Map<String, Object> p, boolean isMp3)  
+            throws ServletException, IOException {  
 
     	AsrAdditionInfo additionInfo = new AsrAdditionInfo(p);
     	if (additionInfo.getErrCode() != 0) {
@@ -57,7 +68,7 @@ public class OlamiController {
     		return Util.JsonResult(String.valueOf(additionInfo.getErrCode()), additionInfo.getErrMsg());  
     	}
     	
-    	String localPathToday = localFilePath + Util.getDateStr() + File.separator;
+    	String localPathToday = localFilePath + getSrcFmt(isMp3) + File.separator + Util.getDateStr() + File.separator;
         // 如果文件存放路径不存在，则mkdir一个  
         File fileSaveDir = new File(localPathToday);  
         if (!fileSaveDir.exists()) {  
@@ -70,27 +81,31 @@ public class OlamiController {
             String fileName_origin = extractFileName(part);
             //这里必须要用原始文件名是否为空来判断，因为part列表是所有数据，前三个被formdata占了，对应文件名其实是空
             if(!StringUtils.isEmpty(fileName_origin)) {
-            	String fileName = additionInfo.getVoiceFileName();
-            	String silkFile = localPathToday + fileName;
-            	Util.p("silkFile[" + count + "]:" + silkFile);
+            	Util.p("originFileName[" + count + "]:" + fileName_origin);
+            	String fileName = additionInfo.getVoiceFileName(isMp3);
+            	//DEBUG on windows, add temp path preffix to local D: to preserve part.write exception.
+            	//String recFile = "D:" + localPathToday + fileName;
+            	String recFile = localPathToday + fileName;
+            	Util.p("recFileName[" + count + "]:" + recFile);
 
-            	part.write(silkFile);
-            	
-            	if (webmBase64Decoder2Wav(silkFile)) {
-            		// support webm/base64 in webmBase64Decoder2Wav();
-            		// is webm base64 format, and xxxx.webm file is temporary created, xxxx.wav was last be converted.
+            	part.write(recFile);
+
+            	if (webmBase64Decode2Wav(recFile)) {
+            		//support webm/base64 in webmBase64Decode2Wav(), wxapp develop IDE record format. 
+            		//even if the suffix is xx.silk(wx.startRecord generate) or xx.mp3(wx.getRecorderManager generate)
+            		//if webm base64 format , and xxxx.webm file is temporary created, xxxx.wav was last be converted.
             	} else {
-            		// run script to convert silk(v3) to wav
-                    Util.RunShell2Wav(SHELL_CMD, silkFile);
+            		// run script to convert silk_v3 or mp3 to wav
+                    Util.RunShell2Wav(SHELL_CMD, recFile);
             	}
             	
                 // get wave file path and name, prepare for olami asr
-                String waveFile = DotSilk2DotOther(silkFile, "wav");
+                String waveFile = DotMp3OrDotSilk2DotOther(recFile, "wav");
                 Util.p("OlamiController.asrUploadFile() waveFile:" + waveFile);
                 
                 if (new File(waveFile).exists() == false) {
                 	Util.w("OlamiController.asrUploadFile() wav file[" + waveFile + "] not exist!", null);
-					return Util.JsonResult("80", "convert silk to wav failed, NOW NOT SUPPORT WXAPP DEVELOP RECORD because it is not silk_v3 format. anyother reason please tell QQ:404499164."); 
+					return Util.JsonResult("80", "convert " + getSrcFmt(isMp3) + " to wav failed, NOW NOT SUPPORT WXAPP DEVELOP RECORD because it is not " + getSrcFmt(isMp3) + " format. anyother reason please tell QQ:404499164."); 
                 }
                 
                 try {
@@ -101,7 +116,7 @@ public class OlamiController {
 					Util.w("OlamiController.asrUploadFile() asr NoSuchAlgorithmException or InterruptedException", e);
 				} catch (FileNotFoundException e) {
 					Util.w("OlamiController.asrUploadFile() asr FileNotFoundException", e);
-					return Util.JsonResult("80", "convert silk to wav failed, NOW NOT SUPPORT WXAPP DEVELOP RECORD because it is not silk_v3 format. anyother reason please tell QQ:404499164."); 
+					return Util.JsonResult("80", "convert " + getSrcFmt(isMp3) + " to wav failed, NOW NOT SUPPORT WXAPP DEVELOP RECORD because it is not " + getSrcFmt(isMp3) + " format. anyother reason please tell QQ:404499164."); 
 				} catch (Exception e) {
 					Util.w("OlamiController.asrUploadFile() asr Exception", e);
 				}
@@ -113,22 +128,26 @@ public class OlamiController {
         //response.setContentType("application/json;charset=UTF-8");
 
         return Util.JsonResult("0", "olami asr success!", asrResult);  
-    }  
-   
+    }
+    
+    private static String getSrcFmt(boolean isMp3) {
+    	return (isMp3 ? "mp3":"silk_v3");
+    }
+    
     /**
      * 将  xxxxx.silk 文件名转 xxxx.wav
      * @param silkName
      * @param otherSubFix
      * @return
      */
-    private static String DotSilk2DotOther(String silkName, String otherSubFix) {
+    private static String DotMp3OrDotSilk2DotOther(String recName, String otherSubFix) {
     	int removeByte = 4;
-    	if (silkName.endsWith("silk")) {
+    	if (recName.endsWith("silk")) {
     		removeByte = 4;
-    	} else if (silkName.endsWith("slk")) {
+    	} else if (recName.endsWith("slk") || recName.endsWith("mp3")) {
     		removeByte = 3;
     	}
-    	return silkName.substring(0, silkName.length()-removeByte) + otherSubFix;
+    	return recName.substring(0, recName.length()-removeByte) + otherSubFix;
     }
     
     /** 
@@ -139,8 +158,7 @@ public class OlamiController {
      *  
      * @param part 
      * @return 
-     */  
-    @SuppressWarnings("unused")
+     */
 	private String extractFileName(Part part) {  
         String contentDisp = part.getHeader("content-disposition");  
         String[] items = contentDisp.split(";");  
@@ -159,14 +177,14 @@ public class OlamiController {
      * @param filePath
      * @return
      */
-	public static boolean webmBase64Decoder2Wav(String filePath) {
+	public static boolean webmBase64Decode2Wav(String filePath) {
 		boolean isWebm = false;
 		try {
 			String encoding = "utf-8";
 			File file = new File(filePath);
 			// 判断文件是否存在
 			if ((file.isFile() == false) || (file.exists() == false)) {
-				Util.w("webmBase64Decoder2Wav() no file[" + filePath + "] exist.", null);
+				Util.w("webmBase64Decode2Wav() no file[" + filePath + "] exist.", null);
 			}
 			
 			StringBuilder lineTxt = new StringBuilder();
@@ -179,19 +197,19 @@ public class OlamiController {
 				}
 				read.close();
 			} catch (Exception e) {
-				Util.w("webmBase64Decoder2Wav() exception0:", e);
+				Util.w("webmBase64Decode2Wav() exception0:", e);
 				return isWebm;
 			}
 			
 			String oldData = lineTxt.toString();
 			if (oldData.startsWith("data:audio/webm;base64,") == false) {
-				Util.d("webmBase64Decoder2Wav() file[" + filePath + "] is not webm, or already decoded." );
+				Util.d("webmBase64Decode2Wav() file[" + filePath + "] is not webm, or already decoded." );
 				return isWebm;
 			}
 			
 			isWebm = true;
 			oldData = oldData.replace("data:audio/webm;base64,", "");
-			String webmFileName = DotSilk2DotOther(filePath, "webm");
+			String webmFileName = DotMp3OrDotSilk2DotOther(filePath, "webm");
 			try {
 
 				File webmFile = new File(webmFileName);
@@ -201,18 +219,18 @@ public class OlamiController {
 					in.write(bt, 0, bt.length);
 					in.close();
 				} catch (IOException e) {
-					Util.w("webmBase64Decoder2Wav() exception1:", e);
+					Util.w("webmBase64Decode2Wav() exception1:", e);
 					return isWebm;
 				}
 			} catch (FileNotFoundException e) {
-				Util.w("webmBase64Decoder2Wav() exception2:", e);
+				Util.w("webmBase64Decode2Wav() exception2:", e);
 				return isWebm;
 			}
 			
 			// run cmd to convert webm to wav
     		Util.RunShell2Wav(SHELL_CMD, webmFileName);
 		} catch (Exception e) {
-			Util.w("webmBase64Decoder2Wav() exception3:", e);
+			Util.w("webmBase64Decode2Wav() exception3:", e);
 			return isWebm;
 		}
 		
@@ -220,6 +238,6 @@ public class OlamiController {
 	}
 	
 	public static void main(String[] args) {
-		webmBase64Decoder2Wav("D:\\secureCRT_RZSZ\\1505716415538_f7d98081-4d21-3b40-a7df-e56c046a784d_b4118cd178064b45b7c8f1242bcde31f.silk");
+		webmBase64Decode2Wav("D:\\secureCRT_RZSZ\\1505716415538_f7d98081-4d21-3b40-a7df-e56c046a784d_b4118cd178064b45b7c8f1242bcde31f.silk");
 	}
 } 
