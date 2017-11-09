@@ -10,6 +10,9 @@
 #       other value  ----  format, convert a folder, batch conversion support
 # Requirement: gcc ffmpeg
 
+# Modified By : happycxz
+# Blog : www.happycxz.com
+
 # Colors
 RED="$(tput setaf 1 2>/dev/null || echo '\e[0;31m')"
 GREEN="$(tput setaf 2 2>/dev/null || echo '\e[0;32m')"
@@ -18,10 +21,14 @@ WHITE="$(tput setaf 7 2>/dev/null || echo '\e[0;37m')"
 RESET="$(tput sgr 0 2>/dev/null || echo '\e[0m')"
 
 SOURCE_FILE_SUFFIX=${1##*.}
-if [ "${SOURCE_FILE_SUFFIX}" = "webm" ]; then
-	## if webm, ffmpeg it directly. webm/base64 had been base64 decoder on my java server already.
+echo -e "XXXX SOURCE_FILE_SUFFIX:${SOURCE_FILE_SUFFIX}"
+if [[ "${SOURCE_FILE_SUFFIX}" == "webm" || "${SOURCE_FILE_SUFFIX}" == "mp3" ]]; then
+	## if webm, ffmpeg it directly. webm/base64 had been base64 decode on api.happycxz.com already.
+	## if mp3, ffmpeg it directly. mp3 do not need to decode, can be convert to wav directly.
 	echo -e "begin to ffmpeg $2 from webm now..."
+	##ffmpeg -i "$1" -f wav -ar 16000 -ac 1 "${1%.*}.$2" > ffmpeg.cxz.log 2>&1
 	ffmpeg -i "$1" -f wav -ar 16000 -ac 1 "${1%.*}.$2" > /dev/null 2>&1
+	##ffmpeg -i "$1" -f wav "${1%.*}.$2" > /dev/null 2>&1
 	ffmpeg_pid=$!
 	while kill -0 "$ffmpeg_pid"; do sleep 1; done > /dev/null 2>&1
 	[ ! -f "${1%.*}.$2" ]&&echo -e "${YELLOW}[Warning]${RESET} Convert $1 false, maybe ffmpeg no format handler for $2."&&exit
